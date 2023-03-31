@@ -161,6 +161,7 @@ jobs:
         rm -rf feeds.buildinfo
         rm -rf R7800-20221111-Stable2203NSS-ath10k-*
         rm -rf packages-Stable2203NSS-ath10k
+        rm -rf packages
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
         echo "status=success" >>$GITHUB_OUTPUT
         
@@ -171,13 +172,7 @@ jobs:
       with:
         name: OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
         path: openwrt/bin
-
-    - name: TAR output
-      run: |
-        cd openwrt/bin/targets/*/*
-        tar -zcvf openwrt-ipq806x-images-r7800-nss.tar.gz ./bin/
-        echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
-                
+        
     - name: Upload firmware directory
       uses: actions/upload-artifact@main
       if: steps.organize.outputs.status == 'success' && !cancelled()
