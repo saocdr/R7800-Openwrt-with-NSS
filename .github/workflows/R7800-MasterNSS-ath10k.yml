@@ -36,8 +36,7 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-20.04
-
+    runs-on: ubuntu-latest
     steps:
     - name: Checkout
       uses: actions/checkout@main
@@ -65,7 +64,7 @@ jobs:
       run: |
         sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
         sudo -E apt-get -qq update
-        sudo -E apt-get -qq install $(curl -fsSL git.io/depends-ubuntu-2004)
+        sudo -E apt-get -qq install $(curl -fsSL is.gd/depends_ubuntu_2204)
         sudo -E apt-get -qq autoremove --purge
         sudo -E apt-get -qq clean
         sudo timedatectl set-timezone "$TZ"
@@ -97,7 +96,10 @@ jobs:
         [ -e files ] && mv files openwrt/files
         [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config
         chmod +x $DIY_P2_SH
+        cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a -f
 
     - name: Cache 缓存加速(7天内对应源码相同机型二次编译有效，每次只保留一个源码的缓存)
       uses: stupidloud/cachewrtbuild@main
@@ -137,42 +139,22 @@ jobs:
       if: (!cancelled())
       run: df -hT
 
-    - name: Organize files
-      id: organize
-      if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
-      run: |
-        cd openwrt/bin/targets/*/*
-        rm -rf C2600*
-        rm -rf D7800*
-        rm -rf EA7500V1*
-        rm -rf EA8500*
-        rm -rf G10*
-        rm -rf NBG6817*
-        rm -rf R7500V1*
-        rm -rf R7500V2*
-        rm -rf RT4230W*
-        rm -rf XR500*
-        rm -rf openwrt-ipq806x-generic-linksys*
-        rm -rf *uImage
-        rm -rf *.manifest
-        rm -rf *.json
-        rm -rf sha256sums-Stable2203NSS-ath10k
-        rm -rf config.buildinfo-Stable2203NSS-ath10k
-        rm -rf feeds.buildinfo
-        rm -rf R7800-20221111-Stable2203NSS-ath10k-*
-        rm -rf packages-Stable2203NSS-ath10k
-        rm -rf packages
-        echo "FIRMWARE=$PWD" >> $GITHUB_ENV
-        echo "status=success" >>$GITHUB_OUTPUT
-        
-
     - name: Upload bin directory
       uses: actions/upload-artifact@main
       if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
       with:
         name: OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
         path: openwrt/bin
-        
+
+    - name: Organize files
+      id: organize
+      if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
+      run: |
+        cd openwrt/bin/targets/*/*
+        rm -rf packages feeds.buildinfo sha256sums profiles.json
+        echo "FIRMWARE=$PWD" >> $GITHUB_ENV
+        echo "status=success" >> $GITHUB_OUTPUT
+
     - name: Upload firmware directory
       uses: actions/upload-artifact@main
       if: steps.organize.outputs.status == 'success' && !cancelled()
