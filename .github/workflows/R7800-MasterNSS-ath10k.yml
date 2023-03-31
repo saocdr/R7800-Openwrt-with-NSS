@@ -137,34 +137,6 @@ jobs:
       if: (!cancelled())
       run: df -hT
 
-    - name: Organize files
-      id: organize
-      if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
-      run: |
-        cd openwrt/bin/targets/*/*
-        rm -rf C2600*
-        rm -rf D7800*
-        rm -rf EA7500V1*
-        rm -rf EA8500*
-        rm -rf G10*
-        rm -rf NBG6817*
-        rm -rf R7500V1*
-        rm -rf R7500V2*
-        rm -rf RT4230W*
-        rm -rf XR500*
-        rm -rf openwrt-ipq806x-generic-linksys*
-        rm -rf *uImage
-        rm -rf *.manifest
-        rm -rf *.json
-        rm -rf sha256sums-Stable2203NSS-ath10k
-        rm -rf config.buildinfo-Stable2203NSS-ath10k
-        rm -rf feeds.buildinfo
-        rm -rf R7800-20221111-Stable2203NSS-ath10k-*
-        rm -rf packages-Stable2203NSS-ath10k
-        echo "FIRMWARE=$PWD" >> $GITHUB_ENV
-        echo "status=success" >>$GITHUB_OUTPUT
-        
-
     - name: Upload bin directory
       uses: actions/upload-artifact@main
       if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
@@ -172,9 +144,13 @@ jobs:
         name: OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
         path: openwrt/bin
 
-    - name: TAR output
+    - name: Organize files
+      id: organize
+      if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
       run: |
-        cd openwrt
+        cp openwrt/.config build.config
+        mv *.config  openwrt/bin/targets/*/*
+        cd openwrt/bin/targets/*/*
         tar -zcvf openwrt-ipq806x-images-r7800-nss.tar.gz ./bin/
         echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
                 
@@ -207,7 +183,7 @@ jobs:
       id: tag
       if: env.UPLOAD_RELEASE == 'true' && !cancelled()
       run: |
-        echo "release_tag=$(date +"%Y.%m.%d-%H%M")" >>$GITHUB_OUTPUT
+        echo "release_tag=$(date +"R7800_5.15-nss.%Y.%m.%d-%H%M")" >>$GITHUB_OUTPUT
         touch release.txt
         [ $UPLOAD_COWTRANSFER = true ] && echo "🔗 [Cowtransfer](${{ steps.cowtransfer.outputs.url }})" >> release.txt
         [ $UPLOAD_WETRANSFER = true ] && echo "🔗 [WeTransfer](${{ steps.wetransfer.outputs.url }})" >> release.txt
