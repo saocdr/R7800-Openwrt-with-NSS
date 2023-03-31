@@ -148,8 +148,6 @@ jobs:
       id: organize
       if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
       run: |
-        cp openwrt/.config build.config
-        mv *.config  openwrt/bin/targets/*/*
         cd openwrt/bin/targets/*/*
         tar -zcvf openwrt-ipq806x-images-r7800-nss.tar.gz ./bin/
         echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
