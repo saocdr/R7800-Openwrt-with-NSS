@@ -104,8 +104,7 @@ jobs:
       if: env.USE_CACHEWRTBUILD == 'true'
       with:
           ccache: true
-          prefix: ${{ github.workspace }}/openwrt
-	  
+          prefix: ${{ github.workspace }}/openwrt	  
     - name: SSH connection to Actions
       uses: P3TERX/ssh2actions@v1.0.0
       if: (github.event.inputs.ssh == 'true' && github.event.inputs.ssh  != 'false') || contains(github.event.action, 'ssh')
