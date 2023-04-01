@@ -27,10 +27,8 @@ env:
   DIY_P1_SH: diy-part1.sh
   DIY_P2_SH: diy-part2.sh
   USE_CACHEWRTBUILD: true
-  UPLOAD_BIN_DIR: true
+  UPLOAD_BIN_DIR: false
   UPLOAD_FIRMWARE: true
-  UPLOAD_COWTRANSFER: false
-  UPLOAD_WETRANSFER: false
   UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
 
@@ -139,6 +137,20 @@ jobs:
       if: (!cancelled())
       run: df -hT
 
+    - name: Zip bin directory
+      if: steps.compile.outputs.status == 'success' && !cancelled()
+      run: cd openwrt/bin && zip -r ${GITHUB_WORKSPACE}/openwrt/OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}.zip *
+
+    - name: Organize files
+      id: organize
+      if: steps.compile.outputs.status == 'success' && env.UPLOAD_FIRMWARE == 'true' && !cancelled()
+      run: |
+        cd openwrt/bin/targets/*/*
+        rm -rf packages
+        mv ${GITHUB_WORKSPACE}/openwrt/OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}.zip ./
+        echo "FIRMWARE=$PWD" >> $GITHUB_ENV
+        echo "status=success" >>$GITHUB_OUTPUT
+	
     - name: Upload bin directory
       uses: actions/upload-artifact@main
       if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
@@ -147,51 +159,42 @@ jobs:
         path: openwrt/bin
 
     - name: TAR output
-              run: tar -cvf ipq806xx-images_R7800_org.tar bin/targets/ipq806x/generic
-
-            - name: Upload artifacts
-              uses: actions/upload-artifact@v2
-              with:
-                name: ipq806x-images_R7800_org
-                path: ipq806xx-images_R7800_org.tar
-
-  release:
-   name: Make a release
-   runs-on: ubuntu-latest
-   needs: build
-
-   steps:
-    - name: Download the image artifacts
-       uses: actions/download-artifact@v2
-       with:
-       name: ipq806x-images_R7800_org
-
-    - name: Extract the image artifacts
-      run: tar xf ipq806xx-images_R7800_org.tar
-              
-    - name: Extract version information from version.buildinfo
-      run: >-
-         echo "BUILDINFO=$(cat bin/targets/ipq806x/generic/version.buildinfo)"
-         >> $GITHUB_ENV
-    - name: Get the current date
-      run: echo "NOW=$(date +%F-%H%M)" >> $GITHUB_ENV
-
-    - name: Create a release
-      uses: "lauravuo/action-automatic-releases@test-changes"
+      run: |
+        cd openwrt
+        tar -zcvf openwrt-ipq806x-images-r7800-nss.tar.gz ./bin/
+        echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
+                
+    - name: Upload firmware directory
+      uses: actions/upload-artifact@main
+      if: steps.organize.outputs.status == 'success' && !cancelled()
       with:
-      repo_token: "${{ secrets.GITHUB_TOKEN }}"
-      prerelease: false
-      title: "ipq806x_R7800_org - ${{ env.NOW }}-(${{ env.BUILDINFO }})"
-      automatic_release_tag: "ipq806x_R7800_org-${{ env.NOW }}@(${{ env.BUILDINFO }})"
-      auto_generate_release_notes: true
-      files: bin/targets/ipq806x/generic/*
+        name: OpenWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
+        path: ${{ env.FIRMWARE }}
 
+    - name: Generate release tag
+      id: tag
+      if: steps.compile.outputs.status == 'success' && env.UPLOAD_RELEASE == 'true' && !cancelled()
+      run: |
+        echo "release_tag=$(date +"%Y.%m.%d-%H%M")" >>$GITHUB_OUTPUT
+        touch release.txt
+        [ $UPLOAD_COWTRANSFER = true ] && echo "🔗 [Cowtransfer](${{ steps.cowtransfer.outputs.url }})" >> release.txt
+        [ $UPLOAD_WETRANSFER = true ] && echo "🔗 [WeTransfer](${{ steps.wetransfer.outputs.url }})" >> release.txt
+        echo "status=success" >>$GITHUB_OUTPUT
 
+    - name: Upload firmware to release
+      uses: softprops/action-gh-release@v1
+      if: steps.tag.outputs.status == 'success' && !cancelled()
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.tag.outputs.release_tag }}
+        body_path: release.txt
+        files: ${{ env.FIRMWARE }}/*
 
     - name: Delete workflow runs
       uses: Mattraks/delete-workflow-runs@main
       with:
-        retain_days: 1
+        retain_days: 0
         keep_minimum_runs: 1
 
     - name: Remove old Releases
